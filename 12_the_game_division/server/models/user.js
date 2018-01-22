@@ -59,6 +59,19 @@ userSchema.pre('save',function(next){
     }
 });
 
+userSchema.statics.findByToken = function(token,cb){
+    var user = this;
+
+    jwt.verify(token,config.SECRET,(err, decode)=>{
+        user.findOne({'_id':decode,'token':token},(err, user)=>{
+            if(err) return cb(err);
+            cb(null,user)
+        })
+    })
+
+};
+
+
 userSchema.methods.generateToken = function(cb){
     var user = this;
     var token = jwt.sign(user._id.toHexString(),config.SECRET);
@@ -76,7 +89,15 @@ userSchema.methods.comparePassword = function(candidatePassword, cb){
         cb(null,isMatch);
     })
 
-}
+};
+
+userSchema.methods.deleteToken = function(token, cb){
+    var user =this;
+    user.update({$unset: {token:1}}, (err, user)=>{
+        if(err) return cb(err);
+        cb(null, user)
+    })
+};
 
 const User = mongoose.model('User',userSchema);
 

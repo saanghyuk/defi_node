@@ -19,10 +19,12 @@
 </head>
 
 <body>
+    <!--서버에서 오는 dashboard값이 true인 경우에만 header 렌더-->
+    {{#unless dashboard}}
+        {{>header}}
+    {{/unless}}
 
-    {{>header}}
-
-{{{body}}}
+    {{{body}}}
 
 </body>
 

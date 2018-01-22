@@ -31,33 +31,99 @@ mongoose.connect(config.DATABASE);
 
 //Models
 const {User} =require('./models/user');
+const {Article} =require('./models/articles');
+const {UserReview} =require('./models/user_reviews');
+
 
 //MIDDLEWARE
 app.use('/css',express.static(__dirname + './../public/css'));
 app.use('/js',express.static(__dirname + './../public/js'));
 
-
-
-//GET
-app.get('/', (req, res)=>{
-   res.render('home');
-});
-
-app.get('/register', (req, res)=>{
-    res.render('register')
-});
-
-app.get('/login', (req, res)=>{
-    res.render('login')
-});
+const {auth} = require('./middleware/auth');
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
+//GET
+app.get('/', (req, res)=>{
+
+    Article.find().sort({_id: 'asc'}).limit(10).exec((err, doc)=>{
+        if(err) return res.status(400).send(err);
+
+        res.render('home', {
+            articles: doc
+        });
+    })
+
+});
+
+app.get('/register',auth, (req, res)=>{
+    if(req.user) return res.redirect('/dashboard');
+    res.render('register')
+});
+
+app.get('/login', auth ,(req, res)=>{
+    if(req.user) return res.redirect('/dashboard');
+    res.render('login')
+});
+
+app.get('/dashboard/logout', auth, (req, res)=>{
+    req.user.deleteToken(req.token,(err, user)=>{
+        if(err) return res.status(400).send(err);
+        res.redirect('/')
+    })
+});
+
+app.get('/games/:id', auth, (req, res)=>{
+    let addReview = !!req.user;
+
+    Article.findById(req.params.id, (err, article)=>{
+        if(err) res.status(400).send(err);
+
+        UserReview.find({'postId':req.params.id}).exec((err, userReviews)=>{
+            res.render('article', {
+                date: moment(article.createdAt).format('MM/DD/YY'),
+                article,
+                review: addReview,
+                userReviews
+            });
+        });
+    })
+});
+
+
+app.get('/dashboard', auth, (req, res)=>{
+    if(!req.user) return res.redirect('/login');
+    res.render('dashboard', {
+        dashboard: true,
+        isAdmin: req.user.role === 1
+    })
+});
+
+app.get('/dashboard/articles', auth, (req, res)=>{
+    if(!req.user) return res.redirect('/dashboard');
+
+    res.render('admin_articles', {
+        dashboard: true,
+        isAdmin: req.user.role === 1
+    });
+});
+
+
+app.get('/dashboard/reviews', auth, (req, res)=>{
+    if(!req.user) return res.redirect('/dashboard');
+   UserReview.find({'ownerId': req.user._id}).exec((err, userReviews)=>{
+       res.render('admin_reviews', {
+           dashboard: true,
+           isAdmin: req.user.role === 1,
+           userReviews
+       });
+   })
+});
 
 // POST
-app.post('/api/register',(req,res)=>{
+app.post('/api/register', (req,res)=>{
     // console.log(req.body);
 
     const user = new User(req.body);
@@ -67,7 +133,7 @@ app.post('/api/register',(req,res)=>{
         user.generateToken((err, user)=>{
             if(err) return res.status(400).send(err);
 
-            //token을 쿠키에 저장하기 why?
+            //token을 쿠키에 저장하기
             res.cookie('auth', user.token).send('ok');
 
         })
@@ -89,6 +155,38 @@ app.post('/api/login',(req,res)=>{
                 res.cookie('auth',user.token).send('ok');
             })
         })
+    })
+});
+
+app.post('/api/add_article', auth, (req, res)=>{
+
+    const article = new Article({
+        ownerUsername: req.user.username,
+        ownerId: req.user._id,
+        title: req.body.title,
+        review: req.body.review,
+        rating: req.body.rating
+    });
+
+    article.save((err, doc)=>{
+        if(err) return res.status(400).send(err);
+        res.status(200).send();
+    })
+});
+
+app.post('/api/user_review', auth, (req, res)=>{
+    const userReview =  new UserReview({
+        postId: req.body.id,
+        ownerUsername: req.user.username,
+        ownerId: req.user._id,
+        titlePost: req.body.titlePost,
+        review: req.body.review,
+        rating: req.body.rating
+    });
+
+    userReview.save((err, doc)=>{
+        if(err) return res.status.send(err);
+        res.status(200).send();
     })
 });
 
