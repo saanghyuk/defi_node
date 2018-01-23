@@ -50,6 +50,7 @@ app.post('/api/uploads',(req, res) =>{
         transformation:[
             {width: 400, height: 400, gravity: "face", crop: "crop"}
         ],
+
         resource_type: 'auto',
     });
 
